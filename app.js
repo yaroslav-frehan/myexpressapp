@@ -1,5 +1,6 @@
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
+const Joi = require("joi");
 
 const prisma = new PrismaClient();
 const app = express();
@@ -7,10 +8,27 @@ const port = 3000;
 
 app.use(express.json());
 
+app.use((req, res, next) => {
+  // console.log(req);
+  console.log("Метод:", req.method, "Шлях:", req.url, );
+  next();
+});
+
+const userSchema = Joi.object({ 
+  name: Joi.string().min(3).max(30).required(),
+  email: Joi.string().email().required(),
+});
+
 app.get("/users", async (req, res) => {
+
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 3;
+  const startIndex = (page - 1) * limit;
+  const endIndex = page * limit;
   try {
     const users = await prisma.user.findMany();
-    res.json(users);
+    const usersSlice = users.slice(startIndex, endIndex);
+    res.json( usersSlice);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -35,7 +53,13 @@ app.get("/users/:id", async (req, res) => {
 });
 
 app.post("/users", async (req, res) => {
-  const { name, email } = req.body;
+  const userData = req.body;
+  const { value, error } = userSchema.validate(userData);
+  if(error) {
+    return res.status(400).json(`Error: ${error.message}`);
+  }
+  
+  const { name, email } = value;
 
   try {
     const user = await prisma.user.create({
