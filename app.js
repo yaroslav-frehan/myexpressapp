@@ -21,8 +21,11 @@ const userSchema = Joi.object({
   email: Joi.string().email().required(),
 });
 
-app.get("/users", async (req, res) => {
+app.get('/health', (req, res) => {
+  res.status(200).send('ok');
+});
 
+app.get("/users", async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 3;
   const startIndex = (page - 1) * limit;
