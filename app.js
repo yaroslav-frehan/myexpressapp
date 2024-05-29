@@ -21,8 +21,8 @@ const userSchema = Joi.object({
   email: Joi.string().email().required(),
 });
 
-app.get('/health', (req, res) => {
-  res.status(200).send('ok');
+app.get('/status', (req, res) => {
+  res.status(200).send('Сервер працює');
 });
 
 app.get("/users", async (req, res) => {
