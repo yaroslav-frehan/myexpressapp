@@ -2,6 +2,8 @@ const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const Joi = require("joi");
 const bcrypt = require("bcrypt");
+const session = require("express-session");
+
 
 const prisma = new PrismaClient();
 const app = express();
@@ -14,6 +16,12 @@ app.use((req, res, next) => {
   console.log("Метод:", req.method, "Шлях:", req.url);
   next();
 });
+
+app.use(session({
+  secret: "your_secretkey_here",
+  resave: false,
+  saveUninitialized: true,
+}))
 
 const userSchema = Joi.object({
   name: Joi.string().min(3).max(30).required(),
@@ -129,10 +137,57 @@ app.post("/login", async (req, res) => {
             return res.status(401).send("Invalid password");
         }
 
+        req.session.username = user.name;
+        req.session.userId = user.id;
+
         res.status(200).send("Login successful")
     } catch (err) {
         res.status(500).send("Login error");
     }
+});
+
+app.get("/profile", async (req, res) => {
+    if (req.session.username) {
+        res.send(`Hi, ${req.session.username}`);
+    } else {
+        res.send("Please log in");
+    }
+});
+
+
+app.post("/change_password", async (req, res) => {
+    const { email, oldPassword, newPassword } = req.body;
+
+    try {
+        const user = await prisma.user.findUnique({
+            where: {
+                email: email,
+            }
+        });
+
+        if (!user) {
+            return res.status(401).send("No user found");
+        }
+
+        const isValidPassword = await bcrypt.compare(oldPassword,user.hashedPassword);
+
+        if (isValidPassword) {
+            return res.status(401).send("Wrong password");
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        await prisma.user.update({
+            where: { email: email },
+            data: { hashedPassword: hashedPassword },
+        })
+
+        res.status(200).send("Password changed successful")
+    } catch (err) {
+        res.status(500).send("Something wrong with password");
+    }
+    
 });
 
 if (require.main === module) {
